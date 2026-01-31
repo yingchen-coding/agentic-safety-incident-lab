@@ -92,6 +92,15 @@ python run_incident.py blast-radius --incident incidents/INC_004.json
 
 # Generate regression test for release gating
 python run_incident.py generate-regression --incident incidents/INC_004.json
+
+# Promote incident to permanent regression case
+python pipeline.py --incident incidents/INC_004.json
+
+# Promote all incidents to regression suite
+python pipeline.py --all
+
+# Verify regression coverage
+python pipeline.py --verify
 ```
 
 ---
@@ -105,6 +114,25 @@ python run_incident.py generate-regression --incident incidents/INC_004.json
 | **INC_003** | Tool Hallucination Cascade | Agent fabricates tool results after timeout error | High |
 | **INC_004** | Coordinated Misuse | Task decomposition creates unauthorized capability | Critical |
 | **INC_005** | Escalation Delay | Human review pending but agent continues deleting | High |
+
+---
+
+## Closed-Loop Safety Pipeline
+
+Every production incident becomes a permanent release gate:
+
+```mermaid
+flowchart LR
+    A[Production Incident] --> B[Incident Lab]
+    B --> C[Root Cause Analysis]
+    B --> D[Trajectory Replay]
+    C --> E[Failure Taxonomy]
+    D --> F[Safeguards Simulator]
+    F --> G[Blocked vs Missed]
+    B --> H[Regression Promotion]
+    H --> I[Safety Regression Suite]
+    I --> J[Release Gate: OK/WARN/BLOCK]
+```
 
 ---
 
@@ -143,23 +171,29 @@ Production Incident
 ```
 agentic-safety-incident-lab/
 ├── incidents/
-│   ├── INC_001.json          # Injection + tool misuse
-│   ├── INC_002.json          # Policy erosion
-│   ├── INC_003.json          # Tool hallucination
-│   ├── INC_004.json          # Coordinated misuse
-│   └── INC_005.json          # Escalation delay
-├── replay.py                  # Incident replay engine
-├── root_cause.py              # Structured RCA with taxonomy
-├── blast_radius.py            # Cross-suite vulnerability scan
-├── generate_regression.py     # Auto-generate regression tests
-├── run_incident.py            # CLI entry point
+│   ├── INC_001.json           # Injection + tool misuse
+│   ├── INC_002.json           # Policy erosion
+│   ├── INC_003.json           # Tool hallucination
+│   ├── INC_004.json           # Coordinated misuse
+│   └── INC_005.json           # Escalation delay
+├── replay.py                   # Incident replay engine
+├── root_cause.py               # Structured RCA
+├── blast_radius.py             # Cross-suite vulnerability scan
+├── generate_regression.py      # Auto-generate regression tests
+├── taxonomy.py                 # Failure type enum + weighted scoring
+├── risk_grading.py             # OK/WARN/BLOCK verdicts for CI/CD
+├── pipeline.py                 # Incident → Regression promotion
+├── run_incident.py             # CLI entry point
 ├── adapters/
-│   ├── misuse_benchmark.py    # Connect to misuse benchmark
-│   ├── stress_tests.py        # Connect to stress tests
+│   ├── misuse_benchmark.py     # Connect to misuse benchmark
+│   ├── stress_tests.py         # Connect to stress tests
 │   ├── safeguards_simulator.py # Connect to simulator
-│   └── regression_suite.py    # Connect to regression suite
+│   └── regression_suite.py     # Connect to regression suite
+├── tests/regressions/          # Promoted regression cases
 └── docs/
-    └── postmortem.md          # 7-step methodology
+    ├── postmortem.md           # 7-step methodology
+    ├── architecture.md         # System architecture diagrams
+    └── interview_qa.md         # 10 high-pressure Q&A
 ```
 
 ---
