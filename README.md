@@ -248,4 +248,11 @@ See [docs/postmortem.md](docs/postmortem.md) for our 7-step framework:
 
 ## License
 
-MIT
+**CC BY-NC 4.0** (Non-Commercial)
+
+- Research use
+- Personal use
+- Academic use
+- **Commercial use prohibited**
+
+See [LICENSE](LICENSE) for details.
