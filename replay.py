@@ -62,7 +62,9 @@ class IncidentReplayer:
             verbose: Print replay output
         """
         incident_id = incident['incident_id']
-        conversation = incident.get('conversation', [])
+
+        # Support both 'trajectory' and 'conversation' keys
+        conversation = incident.get('trajectory', incident.get('conversation', []))
 
         # Handle multi-session incidents
         if 'sessions' in incident:

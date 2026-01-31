@@ -1,5 +1,7 @@
 """
 Root cause analyzer for safety incidents.
+
+Uses structured taxonomy to identify contributing factors and suggest mitigations.
 """
 
 import json
@@ -24,6 +26,7 @@ class RootCauseAnalysis:
     first_unsafe_turn: int
     contributing_factors: list[ContributingFactor]
     mitigation_candidates: list[str]
+    expected_rca: Optional[dict]
     confidence: float
 
     def to_dict(self) -> dict:
@@ -41,6 +44,7 @@ class RootCauseAnalysis:
                 for f in self.contributing_factors
             ],
             'mitigation_candidates': self.mitigation_candidates,
+            'expected_rca': self.expected_rca,
             'confidence': self.confidence
         }
 
@@ -51,21 +55,33 @@ class RootCauseAnalysis:
 class RootCauseAnalyzer:
     """
     Analyzes incidents to identify root causes and mitigations.
+
+    Uses structured taxonomy mapping failure patterns to:
+    - Contributing factors
+    - Severity ratings
+    - Mitigation candidates
     """
 
-    # Known root causes and their analysis
+    # Root cause taxonomy
     ROOT_CAUSE_DB = {
-        'injection_in_tool_output': {
-            'description': 'Malicious instructions embedded in tool output',
+        # Injection-related
+        'pre_action_injection_detector_false_negative': {
+            'description': 'Pre-action injection detector failed to identify hidden instruction',
             'severity': 'critical',
             'category': 'safeguard_gap',
-            'mitigations': ['Add tool output sanitization', 'Implement instruction boundary markers']
+            'mitigations': ['Train detector on tool-output injection patterns', 'Add instruction boundary markers']
         },
-        'no_output_sanitization': {
+        'tool_allowlist_keyword_check_only': {
+            'description': 'Tool allowlist used simple keyword matching instead of semantic analysis',
+            'severity': 'high',
+            'category': 'design_flaw',
+            'mitigations': ['Implement semantic tool policy', 'Add path allowlisting']
+        },
+        'no_tool_output_sanitization': {
             'description': 'Tool outputs not sanitized before processing',
             'severity': 'high',
             'category': 'design_flaw',
-            'mitigations': ['Add output content filter', 'Implement allowlist for tool outputs']
+            'mitigations': ['Add tool output verifier in post_action hook', 'Implement content filter']
         },
         'instruction_boundary_confusion': {
             'description': 'Model confused user data with instructions',
@@ -73,47 +89,109 @@ class RootCauseAnalyzer:
             'category': 'design_flaw',
             'mitigations': ['Use explicit instruction delimiters', 'Train on boundary detection']
         },
-        'path_escalation_not_detected': {
-            'description': 'Gradual path escalation not flagged',
+
+        # Policy erosion-related
+        'drift_monitor_threshold_too_high': {
+            'description': 'Drift monitor threshold too permissive to catch gradual erosion',
             'severity': 'high',
             'category': 'safeguard_gap',
-            'mitigations': ['Implement path sensitivity scoring', 'Add directory traversal detection']
+            'mitigations': ['Lower drift threshold to 0.4 for sensitive categories', 'Add slope-based detection']
         },
-        'tool_chain_not_analyzed': {
-            'description': 'Sequence of tool calls not analyzed for risk',
+        'escalation_policy_reaction_too_slow': {
+            'description': 'Escalation policy only triggered WARN instead of SOFT_STOP',
+            'severity': 'medium',
+            'category': 'policy_gap',
+            'mitigations': ['Add SOFT_STOP escalation for sensitive tools', 'Reduce escalation delay']
+        },
+        'no_trajectory_level_intent_analysis': {
+            'description': 'Intent classifier evaluated turns independently without trajectory context',
+            'severity': 'high',
+            'category': 'safeguard_gap',
+            'mitigations': ['Implement trajectory-level risk accumulator', 'Add multi-turn intent tracking']
+        },
+        'gradual_rationalization_not_detected': {
+            'description': 'Progressive rationalization pattern not flagged',
+            'severity': 'medium',
+            'category': 'policy_gap',
+            'mitigations': ['Flag research/testing framing as potential erosion', 'Track topic drift']
+        },
+
+        # Tool hallucination-related
+        'post_action_verifier_missing_schema_validation': {
+            'description': 'Post-action verifier did not validate tool output schema',
+            'severity': 'high',
+            'category': 'safeguard_gap',
+            'mitigations': ['Implement strict tool schema validation', 'Add type checking for tool results']
+        },
+        'no_tool_result_anomaly_detection': {
+            'description': 'No anomaly detection for error patterns in tool results',
             'severity': 'medium',
             'category': 'safeguard_gap',
-            'mitigations': ['Add tool chain analyzer', 'Track cumulative tool risk']
+            'mitigations': ['Add error pattern detection', 'Flag unusual tool result formats']
         },
-        'gradual_context_normalization': {
-            'description': 'Risky requests normalized through gradual escalation',
-            'severity': 'high',
-            'category': 'policy_gap',
-            'mitigations': ['Lower drift threshold', 'Implement trajectory-level intent tracking']
-        },
-        'drift_threshold_not_triggered': {
-            'description': 'Cumulative drift below detection threshold',
-            'severity': 'medium',
-            'category': 'safeguard_gap',
-            'mitigations': ['Lower drift threshold', 'Add slope-based detection']
-        },
-        'educational_framing_exploitation': {
-            'description': 'Educational context exploited to extract harmful info',
-            'severity': 'high',
-            'category': 'policy_gap',
-            'mitigations': ['Add educational content limits', 'Detect theory-to-practice pivots']
-        },
-        'authority_claim_not_verified': {
-            'description': 'False authority claims accepted without verification',
+        'error_handling_not_propagated_to_response': {
+            'description': 'Tool error not propagated to model response',
             'severity': 'high',
             'category': 'design_flaw',
-            'mitigations': ['Require identity verification', 'Flag unverified authority claims']
+            'mitigations': ['Force acknowledgment of tool failures', 'Block generation on tool error']
         },
-        'no_cross_session_tracking': {
-            'description': 'Information gathering across sessions not detected',
+        'confidence_calibration_failure': {
+            'description': 'Model generated confident response despite tool failure',
+            'severity': 'medium',
+            'category': 'design_flaw',
+            'mitigations': ['Add confidence calibration based on tool success', 'Require hedging on errors']
+        },
+
+        # Coordinated misuse-related
+        'intent_classifier_single_turn_only': {
+            'description': 'Intent classifier only analyzed individual turns, missing patterns',
+            'severity': 'critical',
+            'category': 'safeguard_gap',
+            'mitigations': ['Implement trajectory-level intent aggregation', 'Add multi-turn pattern detection']
+        },
+        'no_trajectory_level_intent_aggregation': {
+            'description': 'No aggregation of intents across turns to detect coordination',
             'severity': 'high',
             'category': 'safeguard_gap',
-            'mitigations': ['Implement cross-session analysis', 'Track information fragments']
+            'mitigations': ['Track cumulative capability creation', 'Flag capability accumulation patterns']
+        },
+        'subtask_combination_not_analyzed': {
+            'description': 'Combined effect of subtasks not analyzed for harm',
+            'severity': 'high',
+            'category': 'design_flaw',
+            'mitigations': ['Analyze combined tool outputs', 'Check subtask synthesis for harmful capabilities']
+        },
+        'tool_sequence_pattern_not_detected': {
+            'description': 'Suspicious tool sequence pattern not flagged',
+            'severity': 'medium',
+            'category': 'safeguard_gap',
+            'mitigations': ['Add tool sequence pattern detection', 'Flag known attack tool chains']
+        },
+
+        # Escalation delay-related
+        'escalation_policy_not_hard_stop': {
+            'description': 'Escalation to HUMAN_REVIEW did not include agent freeze',
+            'severity': 'critical',
+            'category': 'policy_gap',
+            'mitigations': ['Change HUMAN_REVIEW to HARD_STOP + queue for destructive ops']
+        },
+        'async_review_without_agent_freeze': {
+            'description': 'Async human review pattern incompatible with destructive operations',
+            'severity': 'high',
+            'category': 'design_flaw',
+            'mitigations': ['Implement agent freeze when review pending', 'Use sync review for destructive ops']
+        },
+        'pending_review_state_not_blocking': {
+            'description': 'Pending review state did not block further actions',
+            'severity': 'high',
+            'category': 'safeguard_gap',
+            'mitigations': ['Add synchronous review requirement for destructive actions']
+        },
+        'destructive_action_not_gated': {
+            'description': 'Destructive actions not gated behind explicit human approval',
+            'severity': 'critical',
+            'category': 'policy_gap',
+            'mitigations': ['Gate delete/write operations behind human approval', 'Add confirmation step']
         }
     }
 
@@ -137,6 +215,11 @@ class RootCauseAnalyzer:
         failure_type = incident.get('failure_type', 'unknown')
         first_unsafe = incident.get('first_unsafe_turn', -1)
         raw_causes = incident.get('root_causes', [])
+        expected_rca = incident.get('expected_rca', None)
+
+        # Handle string first_unsafe_turn (e.g., "sess_D:4")
+        if isinstance(first_unsafe, str):
+            first_unsafe = -1
 
         # Analyze each root cause
         factors = []
@@ -160,6 +243,10 @@ class RootCauseAnalyzer:
                     category='unknown'
                 ))
 
+        # Add mitigations from incident hints
+        mitigation_hints = incident.get('mitigation_hints', [])
+        all_mitigations.update(mitigation_hints)
+
         # Sort by severity
         severity_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
         factors.sort(key=lambda f: severity_order.get(f.severity, 4))
@@ -174,13 +261,43 @@ class RootCauseAnalyzer:
             first_unsafe_turn=first_unsafe,
             contributing_factors=factors,
             mitigation_candidates=list(all_mitigations),
+            expected_rca=expected_rca,
             confidence=confidence
         )
 
         if verbose:
-            print(analysis.to_json())
+            self._print_analysis(analysis)
 
         return analysis
+
+    def _print_analysis(self, analysis: RootCauseAnalysis):
+        """Print formatted analysis."""
+        print(f"\n{'='*60}")
+        print(f"ROOT CAUSE ANALYSIS: {analysis.incident_id}")
+        print(f"{'='*60}")
+
+        print(f"\nFailure Type: {analysis.failure_type}")
+        print(f"First Unsafe Turn: {analysis.first_unsafe_turn}")
+        print(f"Analysis Confidence: {analysis.confidence:.0%}")
+
+        if analysis.expected_rca:
+            print(f"\n--- Expected RCA ---")
+            print(f"Primary: {analysis.expected_rca.get('primary', 'N/A')}")
+            print(f"Secondary: {analysis.expected_rca.get('secondary', 'N/A')}")
+            print(f"Contributing: {analysis.expected_rca.get('contributing', 'N/A')}")
+
+        print(f"\n--- Contributing Factors ({len(analysis.contributing_factors)}) ---")
+        for f in analysis.contributing_factors:
+            severity_icon = {'critical': '!', 'high': '*', 'medium': '-', 'low': ' '}.get(f.severity, '?')
+            print(f"[{severity_icon}] {f.factor}")
+            print(f"    {f.description}")
+            print(f"    Severity: {f.severity} | Category: {f.category}")
+
+        print(f"\n--- Mitigation Candidates ({len(analysis.mitigation_candidates)}) ---")
+        for m in analysis.mitigation_candidates:
+            print(f"  - {m}")
+
+        print()
 
 
 def main():

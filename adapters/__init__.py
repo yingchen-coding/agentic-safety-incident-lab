@@ -1,13 +1,18 @@
 """
 Adapters for connecting to evaluation suites.
 
-These adapters allow the incident lab to scan for similar vulnerabilities
-across existing evaluation infrastructure.
+These adapters allow the incident lab to analyze blast radius
+and generate regression tests across the safety portfolio.
 """
 
-# In production, these would import from actual evaluation repos:
-# from agentic_misuse_benchmark import MisuseBenchmark
-# from safeguards_stress_tests import StressTestRunner
-# from agentic_safeguards_simulator import SafeguardsSimulator
+from .misuse_benchmark import MisuseBenchmarkAdapter
+from .stress_tests import StressTestsAdapter
+from .safeguards_simulator import SafeguardsSimulatorAdapter
+from .regression_suite import RegressionSuiteAdapter
 
-# For this prototype, blast_radius.py uses simulated results.
+__all__ = [
+    'MisuseBenchmarkAdapter',
+    'StressTestsAdapter',
+    'SafeguardsSimulatorAdapter',
+    'RegressionSuiteAdapter'
+]
