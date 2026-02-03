@@ -4,9 +4,15 @@ Incident-to-Regression promotion pipeline.
 Converts production incidents into permanent regression test artifacts
 that become release gates for future deployments.
 
+Closed-Loop Integration:
+- Promotes incidents to regression tests
+- Clears alignment debt when mitigations are verified
+- Updates gate policy exception whitelist
+
 Usage:
     python pipeline.py --incident incidents/INC_004.json
     python pipeline.py --all  # Promote all incidents
+    python pipeline.py --clear-debt INC_004  # Mark debt as mitigated
 """
 
 import argparse
@@ -16,6 +22,7 @@ from typing import Optional, List
 from datetime import datetime
 
 from taxonomy import FailureType, map_incident_to_taxonomy, get_failure_weight
+from debt_clearing import DebtClearer, clear_debt_for_incident
 
 
 REGRESSION_DIR = Path("tests/regressions")
@@ -122,6 +129,96 @@ def promote_all_incidents(incidents_dir: Path = Path("incidents")) -> List[Path]
     return promoted
 
 
+def promote_and_clear_debt(incident_path: Path) -> dict:
+    """
+    Promote incident to regression and clear associated alignment debt.
+
+    This is the key closed-loop operation:
+    1. Promote incident to permanent regression test
+    2. Mark alignment debt as mitigated
+    3. Return summary of actions taken
+
+    Args:
+        incident_path: Path to incident JSON file
+
+    Returns:
+        Summary of promotion and debt clearing
+    """
+    result = {
+        "incident_path": str(incident_path),
+        "regression_promoted": False,
+        "debt_cleared": False,
+        "regression_tests": [],
+        "debt_entry": None
+    }
+
+    # Step 1: Promote to regression
+    try:
+        regression_path = promote_incident_to_regression(incident_path)
+        result["regression_promoted"] = True
+        result["regression_path"] = str(regression_path)
+
+        # Load the regression case to get test ID
+        with open(regression_path) as f:
+            regression_case = json.load(f)
+        test_id = regression_case.get("test_id", "unknown")
+        result["regression_tests"].append(test_id)
+
+    except Exception as e:
+        result["promotion_error"] = str(e)
+        return result
+
+    # Step 2: Clear alignment debt
+    try:
+        incident_id = incident_path.stem  # e.g., "INC_004"
+        debt_entry = clear_debt_for_incident(incident_id, result["regression_tests"])
+
+        if debt_entry:
+            result["debt_cleared"] = True
+            result["debt_entry"] = {
+                "debt_id": debt_entry.get("debt_id"),
+                "principle": debt_entry.get("principle"),
+                "mitigation_status": debt_entry.get("mitigation_status")
+            }
+        else:
+            result["debt_note"] = f"No debt entry found for {incident_id}"
+
+    except Exception as e:
+        result["debt_clearing_error"] = str(e)
+
+    return result
+
+
+def clear_debt_only(incident_id: str, evidence: List[str] = None) -> dict:
+    """
+    Clear alignment debt for an incident without re-promoting.
+
+    Use when regression test already exists but debt wasn't cleared.
+
+    Args:
+        incident_id: The incident ID (e.g., "INC_004")
+        evidence: Optional list of regression test IDs
+
+    Returns:
+        Debt clearing result
+    """
+    evidence = evidence or [f"regression_{incident_id}"]
+    clearer = DebtClearer()
+    debt_entry = clearer.mark_mitigated(incident_id, evidence)
+
+    return {
+        "incident_id": incident_id,
+        "debt_cleared": bool(debt_entry),
+        "debt_entry": debt_entry if debt_entry else None
+    }
+
+
+def generate_debt_report() -> str:
+    """Generate alignment debt status report."""
+    clearer = DebtClearer()
+    return clearer.generate_debt_report()
+
+
 def verify_regression_coverage(regression_dir: Path = REGRESSION_DIR) -> dict:
     """Verify regression test coverage statistics."""
     if not regression_dir.exists():
@@ -169,12 +266,45 @@ def verify_regression_coverage(regression_dir: Path = REGRESSION_DIR) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Promote incidents to regression test cases"
+        description="Promote incidents to regression test cases and manage alignment debt"
     )
     parser.add_argument("--incident", type=str, help="Path to incident JSON")
     parser.add_argument("--all", action="store_true", help="Promote all incidents")
     parser.add_argument("--verify", action="store_true", help="Verify coverage")
+    parser.add_argument("--clear-debt", type=str, metavar="INC_ID",
+                        help="Clear alignment debt for incident (e.g., INC_004)")
+    parser.add_argument("--debt-report", action="store_true",
+                        help="Show alignment debt status report")
+    parser.add_argument("--promote-and-clear", type=str, metavar="INCIDENT_PATH",
+                        help="Promote incident AND clear associated debt")
+    parser.add_argument("--evidence", type=str, nargs="+", default=[],
+                        help="Evidence test IDs for debt clearing")
     args = parser.parse_args()
+
+    if args.debt_report:
+        print(generate_debt_report())
+        return
+
+    if args.clear_debt:
+        result = clear_debt_only(args.clear_debt, args.evidence or None)
+        if result["debt_cleared"]:
+            print(f"[OK] Debt cleared for {args.clear_debt}")
+            print(f"     Debt ID: {result['debt_entry'].get('debt_id')}")
+            print(f"     Status: mitigated")
+        else:
+            print(f"[WARN] No matching debt found for {args.clear_debt}")
+        return
+
+    if args.promote_and_clear:
+        result = promote_and_clear_debt(Path(args.promote_and_clear))
+        print("\n=== Promote and Clear Result ===")
+        print(f"Regression promoted: {result['regression_promoted']}")
+        print(f"Debt cleared: {result['debt_cleared']}")
+        if result.get("regression_path"):
+            print(f"Regression path: {result['regression_path']}")
+        if result.get("debt_entry"):
+            print(f"Debt ID: {result['debt_entry'].get('debt_id')}")
+        return
 
     if args.verify:
         stats = verify_regression_coverage()

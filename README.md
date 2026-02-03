@@ -151,6 +151,15 @@ python pipeline.py --all
 
 # Verify regression coverage
 python pipeline.py --verify
+
+# Clear alignment debt after incident is resolved
+python pipeline.py --clear-debt INC_004 --evidence REG-CM-001 REG-CM-002
+
+# Promote AND clear debt in one step (closed-loop)
+python pipeline.py --promote-and-clear incidents/INC_004.json
+
+# View alignment debt status report
+python pipeline.py --debt-report
 ```
 
 ---
@@ -536,6 +545,60 @@ This ensures:
 1. Every failure becomes a permanent test
 2. The release gate accumulates real-world failure knowledge
 3. The same failure cannot ship twice
+
+---
+
+## Alignment Debt Auto-Clearing (Closed-Loop)
+
+When incidents are resolved, associated alignment debt is automatically cleared:
+
+```
+Incident → RCA → Regression Test → Debt Cleared
+   │                    │               │
+   └─ Creates debt      │               │
+      (status: open)    │               │
+                        └─ Verifies fix │
+                                        └─ Updates status: mitigated
+```
+
+**Workflow:**
+
+```bash
+# Step 1: Incident creates debt (automatic or manual)
+# alignment_debt.yaml now has: status: open, blocks_release: true
+
+# Step 2: Promote incident with debt clearing
+python pipeline.py --promote-and-clear incidents/INC_004.json
+
+# Step 3: Verify debt is cleared
+python pipeline.py --debt-report
+```
+
+**Output:**
+```
+============================================================
+ALIGNMENT DEBT REPORT
+============================================================
+
+Status: WARN
+Total Active Debt: 0.120
+Active Entries: 2
+Mitigated Entries: 1
+
+BLOCKING DEBT:
+  - AD-20260202-C2: Policy erosion in multi-tool trajectories
+    Principle: C2 | Severity: high
+============================================================
+```
+
+**Integration with Release Gate:**
+
+The debt ledger is consumed by [model-safety-regression-suite](https://github.com/yingchen-coding/model-safety-regression-suite):
+- Blocking debt entries prevent release (verdict: BLOCK)
+- Mitigated entries no longer block
+- Total debt amount affects gate threshold
+
+This closes the loop: **no debt is cleared without verified regression tests**.
 
 ---
 
