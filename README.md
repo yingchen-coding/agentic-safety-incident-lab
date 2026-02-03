@@ -20,6 +20,8 @@ Post-deployment incident replay, root-cause analysis, and regression hardening f
 - ❌ Generate attack templates (stress-tests' job)
 - ❌ Implement safeguards (simulator's job)
 
+> **Boundary Statement**: Incident lab **informs future tests**, it **cannot change live policy directly**. RCA and regression promotion are recommendations. The release gate decides whether to accept promoted regressions. Final authority lives in [model-safety-regression-suite](https://github.com/yingchen-coding/model-safety-regression-suite).
+
 ---
 
 ## What This Is
