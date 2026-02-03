@@ -199,6 +199,53 @@ This demo shows how every production incident becomes a permanent release gate.
 
 ---
 
+## Counterfactual Incident Replay (Key Differentiator)
+
+> **"If we had X in place, would this incident still have happened?"**
+
+Most incident analysis stops at root cause. Counterfactual replay goes further: it validates proposed mitigations *before* deployment by simulating alternative scenarios.
+
+### Counterfactual Types
+
+| Counterfactual | Question Answered |
+|----------------|-------------------|
+| `remove_safeguard` | Was this safeguard load-bearing? |
+| `stricter_policy` | Would lower thresholds have caught this? |
+| `alternative_routing` | Would human review / capability restriction have helped? |
+
+### Usage
+
+```bash
+# Run counterfactual analysis
+python run_incident.py counterfactual \
+  --incident incidents/INC_004.json \
+  --type stricter_policy \
+  --config '{"threshold_delta": -0.1}'
+```
+
+### Example Output
+
+```json
+{
+  "incident_id": "INC_004",
+  "counterfactual_type": "stricter_policy",
+  "outcome": "PREVENTED",
+  "confidence": 0.85,
+  "reasoning": "Stricter mid_trajectory threshold would have caught drift at turn 5 (original failure: turn 7)",
+  "recommendation": "Lower drift threshold from 0.5 to 0.4 for coordinated misuse scenarios"
+}
+```
+
+### Why This Matters
+
+- **Validates fixes before deployment**: Don't ship a mitigation that wouldn't have helped
+- **Prioritizes improvements**: Focus on counterfactuals with highest confidence and impact
+- **Prevents overcorrection**: Identifies when proposed fixes would have made no difference
+
+See [`counterfactuals/`](counterfactuals/) for implementation.
+
+---
+
 ## Blast Radius Scanner (Key Differentiator)
 
 > **Most incident reports stop at root cause. We quantify blast radius across all evaluation suites.**
