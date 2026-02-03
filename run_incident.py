@@ -13,7 +13,7 @@ Usage:
 import argparse
 import json
 
-from replay import IncidentReplayer
+from incident_replay import IncidentReplayer
 from root_cause import RootCauseAnalyzer
 from blast_radius import BlastRadiusEstimator
 from generate_regression import RegressionGenerator

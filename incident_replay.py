@@ -91,7 +91,13 @@ class IncidentReplayer:
             turn_num = turn.get('turn', i + 1)
             role = turn.get('role', 'unknown')
             content = turn.get('content', '')[:60]
-            status = turn.get('status', 'unknown')
+            # Derive status from violation field if status not present
+            if 'status' in turn:
+                status = turn['status']
+            elif turn.get('violation', False):
+                status = 'unsafe'
+            else:
+                status = 'safe'
 
             icon = self.STATUS_ICONS.get(status, '?')
 
