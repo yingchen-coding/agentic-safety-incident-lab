@@ -337,6 +337,8 @@ agentic-safety-incident-lab/
 │   ├── README.md              # Regression types documentation
 │   ├── INC_XXX_unit_*.py      # Unit regression tests
 │   └── INC_XXX_e2e_*.yaml     # End-to-end regression tests
+├── analysis/
+│   └── severity_scoring.py     # Severity + business impact scoring
 ├── replay.py                   # Incident replay engine
 ├── root_cause.py               # Structured RCA
 ├── blast_radius.py             # Cross-suite vulnerability scan
