@@ -105,6 +105,52 @@ python pipeline.py --verify
 
 ---
 
+## 5-Minute Demo Walkthrough
+
+This walkthrough demonstrates the full incident-to-regression pipeline.
+
+**Step 1: Replay an incident**
+```bash
+python run_incident.py replay --incident incidents/INC_004.json
+```
+
+Watch the turn-by-turn trajectory replay showing where safeguards failed.
+
+**Step 2: Analyze root cause**
+
+```bash
+python run_incident.py analyze --incident incidents/INC_004.json
+```
+
+Review the structured root cause analysis identifying detection gaps.
+
+**Step 3: Estimate blast radius**
+
+```bash
+python run_incident.py blast-radius --incident incidents/INC_004.json
+```
+
+See how many other scenarios in the evaluation suites share this vulnerability pattern.
+
+**Step 4: Generate and promote regression test**
+
+```bash
+python run_incident.py generate-regression --incident incidents/INC_004.json
+python pipeline.py --incident incidents/INC_004.json
+```
+
+Auto-generate a regression test and promote it to the permanent suite.
+
+**Expected outcome:**
+- Incident replays with turn-by-turn SAFE/UNSAFE annotations
+- Root cause identifies "single-turn intent analysis" as primary gap
+- Blast radius estimates 15-20% of coordinated misuse scenarios affected
+- Regression test auto-generated with OK/WARN/BLOCK verdict logic
+
+This demo shows how every production incident becomes a permanent release gate.
+
+---
+
 ## Sample Incidents
 
 | ID | Failure Type | Pattern | Severity |
@@ -222,13 +268,40 @@ agentic-safety-incident-lab/
 
 ---
 
-## Limitations
+## Completeness & Limitations
 
-- **Sample incidents are synthetic** — Real incidents require sanitization before inclusion
-- **RCA uses heuristics** — Production systems should combine with human review
-- **Blast radius is estimated** — Based on pattern matching, not exhaustive evaluation
-- **Mitigation suggestions need validation** — Generated hints, not tested fixes
-- **No real-time integration** — Designed for post-hoc analysis, not live monitoring
+This toolkit provides structured incident analysis, replay, and regression promotion for agentic safety systems. It is designed to support continuous safety improvement rather than real-time incident response.
+
+**What is complete:**
+- Incident schema with structured root cause taxonomy and severity grading.
+- Replay engine to reproduce failures from conversation logs with turn-by-turn analysis.
+- Blast radius estimation to scope vulnerability across evaluation suites.
+- Auto-generation of regression tests from incidents with OK/WARN/BLOCK verdicts.
+- Pipeline to promote incidents to permanent release gates.
+
+**Key limitations:**
+- **Synthetic incidents:** Sample incidents are synthetic; real production incidents require sanitization and legal review before inclusion.
+- **Heuristic RCA:** Root cause analysis uses pattern matching; human review is required for nuanced contributing factors.
+- **Blast radius estimation:** Based on pattern matching, not exhaustive re-evaluation; may under/overestimate scope.
+- **Mitigation suggestions:** Generated hints for human review, not tested fixes.
+- **Post-hoc only:** Designed for post-incident analysis, not real-time detection or response.
+
+**Future work:**
+- Integration with real-time monitoring for faster incident capture.
+- Machine learning for root cause classification beyond heuristics.
+- Automated mitigation validation before promotion.
+- Privacy-preserving incident schemas for real production data.
+
+This project is part of a larger closed-loop safety system. See the portfolio overview for how this component integrates with benchmarks, safeguards, stress tests, release gating, and incident-driven regression.
+
+---
+
+## What This Repo Is NOT
+
+- This is not a real-time incident detection system. It is for post-hoc analysis and learning.
+- This is not a replacement for human incident response. RCA outputs are starting points for investigation.
+- Sample incidents are synthetic; real incidents require sanitization before inclusion.
+- Blast radius estimates are heuristic; exhaustive re-evaluation may be needed for critical incidents.
 
 ---
 
@@ -246,13 +319,25 @@ See [docs/postmortem.md](docs/postmortem.md) for our 7-step framework:
 
 ---
 
+## Citation
+
+```bibtex
+@misc{chen2026incidentlab,
+  title  = {Agentic Safety Incident Lab: Post-Deployment Analysis and Regression Hardening},
+  author = {Chen, Ying},
+  year   = {2026}
+}
+```
+
+---
+
+## Contact
+
+Ying Chen, Ph.D.
+yingchen.for.upload@gmail.com
+
+---
+
 ## License
 
-**CC BY-NC 4.0** (Non-Commercial)
-
-- Research use
-- Personal use
-- Academic use
-- **Commercial use prohibited**
-
-See [LICENSE](LICENSE) for details.
+CC BY-NC 4.0
