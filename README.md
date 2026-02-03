@@ -4,6 +4,8 @@
 
 > Post-deployment incident replay, root-cause analysis, and regression hardening for agentic safeguards.
 
+**[System Architecture & Boundaries →](ARCHITECTURE.md)** | How this repo fits into the closed-loop safety system
+
 ## What This Is
 
 A toolkit for analyzing safety incidents in agentic AI systems. When an agent fails in production, this lab helps you:
