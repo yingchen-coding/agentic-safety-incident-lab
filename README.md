@@ -395,6 +395,12 @@ agentic-safety-incident-lab/
 │   ├── README.md              # Regression types documentation
 │   ├── INC_XXX_unit_*.py      # Unit regression tests
 │   └── INC_XXX_e2e_*.yaml     # End-to-end regression tests
+├── pipeline/
+│   ├── settle_alignment_debt.py  # Clear debt after verified replay
+│   └── debt_aging.py             # SLO enforcement + aging KPIs
+├── artifacts/
+│   ├── incident_replay_results.json  # Verification outputs
+│   └── debt_aging_report.json        # Aging dashboard data
 ├── analysis/
 │   └── severity_scoring.py     # Severity + business impact scoring
 ├── replay.py                   # Incident replay engine
@@ -403,7 +409,8 @@ agentic-safety-incident-lab/
 ├── generate_regression.py      # Auto-generate regression tests
 ├── taxonomy.py                 # Failure type enum + weighted scoring
 ├── risk_grading.py             # OK/WARN/BLOCK verdicts for CI/CD
-├── pipeline.py                 # Incident → Regression promotion
+├── pipeline.py                 # Incident → Regression promotion + debt clearing
+├── debt_clearing.py            # Alignment debt lifecycle management
 ├── run_incident.py             # CLI entry point
 ├── adapters/
 │   ├── misuse_benchmark.py     # Connect to misuse benchmark
@@ -599,6 +606,57 @@ The debt ledger is consumed by [model-safety-regression-suite](https://github.co
 - Total debt amount affects gate threshold
 
 This closes the loop: **no debt is cleared without verified regression tests**.
+
+---
+
+## Debt Aging & SLO Enforcement
+
+Alignment debt has organizational SLOs:
+
+| Severity | Warning | Escalate | Auto-BLOCK |
+|----------|---------|----------|------------|
+| Critical | 14 days | 30 days  | 45 days    |
+| High     | 14 days | 30 days  | 60 days    |
+| Medium   | 14 days | 30 days  | 90 days    |
+
+**Check SLO status:**
+```bash
+python pipeline/debt_aging.py --check
+```
+
+**Enforce blocking rules:**
+```bash
+python pipeline/debt_aging.py --enforce
+```
+
+**Export dashboard data:**
+```bash
+python pipeline/debt_aging.py --dashboard
+```
+
+**Sample output:**
+```
+============================================================
+ALIGNMENT DEBT AGING ANALYSIS
+============================================================
+
+Active debt entries: 3
+
+[ALERT] SLO VIOLATIONS: 1
+  - AD-2026-01: 43 days (ESCALATE)
+    Principle: C4 | Owner: Evaluation Infrastructure
+
+[WARN] Approaching SLO: 1
+  - AD-2026-02: 18 days (blocks in 42 days)
+
+============================================================
+```
+
+**Why this matters:**
+- Debt without deadlines becomes permanent
+- SLOs create organizational accountability
+- Aging curves are org-level safety KPIs
+- Auto-BLOCK prevents debt from being ignored
 
 ---
 
